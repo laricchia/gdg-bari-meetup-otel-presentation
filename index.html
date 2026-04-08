@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="slides-format" content="viewport">
+    <title>OpenTelemetry – Intro all'Observability</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300..700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+        @theme {
+            --color-bg: #0a0f1a;
+            --color-bg-deep: #050810;
+            --color-surface: #111827;
+            --color-text: #f1f5f9;
+            --color-text-secondary: #cbd5e1;
+            --color-text-muted: #64748b;
+            --color-accent-1: #38bdf8;
+            --color-accent-2: #818cf8;
+            --color-accent-3: #34d399;
+            --color-glass-bg: rgba(255,255,255,0.05);
+            --color-glass-border: rgba(255,255,255,0.09);
+            --color-vignette: rgba(0,0,0,0.45);
+            --font-display: 'Instrument Serif', Georgia, serif;
+            --font-body: 'Inter', system-ui, sans-serif;
+        }
+    </style>
+    <style>
+        :root { --color-bg: #0a0f1a; --color-text: #f1f5f9; --glow-color-rgb: 56,189,248; }
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { background: var(--color-bg); margin: 0; }
+        body { font-family: var(--font-body); color: var(--color-text); overflow: hidden; height: 100vh; width: 100vw; }
+        .deck { width: 100vw; height: 100vh; position: relative; }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--color-bg); display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; transform: scale(0.95); transition: opacity 0.7s ease, transform 0.7s ease; pointer-events: none; overflow: hidden; }
+        .slide.active { opacity: 1; transform: scale(1); pointer-events: all; }
+        .slide > .content { position: relative; z-index: 2; width: 100%; max-width: 1100px; padding: clamp(1.5rem, 4vw, 3.5rem); }
+        .nav-controls { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 16px; z-index: 100; background: var(--color-glass-bg); backdrop-filter: blur(10px); padding: 8px 22px; border-radius: 40px; border: 1px solid var(--color-glass-border); }
+        .nav-btn { width: 36px; height: 36px; border: none; background: var(--color-glass-bg); color: var(--color-accent-1); border-radius: 50%; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.3s; }
+        .nav-btn:hover { background: var(--color-glass-border); }
+        .slide-dots { display: flex; gap: 7px; }
+        .slide-dots .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--color-glass-border); cursor: pointer; transition: background 0.3s, transform 0.3s; }
+        .slide-dots .dot.active { background: var(--color-accent-1); transform: scale(1.3); }
+        .slide-counter { font-size: 0.78rem; color: var(--color-text-muted); min-width: 36px; text-align: center; }
+        .reveal { opacity: 0; transform: translateY(20px); }
+        .text-glow { text-shadow: 0 0 20px rgba(56,189,248,0.5), 0 0 40px rgba(56,189,248,0.2); }
+        @keyframes glow-pulse { 0%,100% { text-shadow: 0 0 20px rgba(56,189,248,0.5); } 50% { text-shadow: 0 0 40px rgba(56,189,248,0.9); } }
+        .glow-pulse { animation: glow-pulse 3s ease-in-out infinite; }
+        @keyframes float-slow { 0% { transform:translate(0,0) scale(1); } 25% { transform:translate(60px,-50px) scale(1.12); } 50% { transform:translate(-40px,40px) scale(0.9); } 75% { transform:translate(50px,20px) scale(1.08); } 100% { transform:translate(0,0) scale(1); } }
+        @keyframes float-drift { 0% { transform:translate(0,0) scale(1) rotate(0deg); } 33% { transform:translate(-50px,-60px) scale(1.15) rotate(3deg); } 66% { transform:translate(40px,30px) scale(0.88) rotate(-2deg); } 100% { transform:translate(0,0) scale(1) rotate(0deg); } }
+        @keyframes float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-15px); } }
+        @keyframes avatar-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(56,189,248,0.4); } 50% { box-shadow: 0 0 0 12px rgba(56,189,248,0); } }
+        .gradient-mesh { position:absolute; inset:0; z-index:0; overflow:hidden; pointer-events:none; }
+        .blob { position:absolute; border-radius:50%; filter:blur(80px); animation:float-slow 10s ease-in-out infinite; }
+        .blob:nth-child(2) { animation:float-drift 14s ease-in-out infinite; }
+        .blob:nth-child(3) { animation:float-slow 18s ease-in-out infinite reverse; }
+        .slide::before { content:''; position:absolute; inset:0; z-index:1; pointer-events:none; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"); background-repeat:repeat; background-size:256px; opacity:0.03; mix-blend-mode:overlay; }
+        .slide::after { content:''; position:absolute; inset:0; z-index:1; pointer-events:none; background:radial-gradient(ellipse at center, transparent 50%, var(--color-vignette) 100%); }
+        .wf-bar { height:28px; border-radius:6px; position:relative; display:flex; align-items:center; padding:0 10px; font-size:0.78rem; font-weight:600; color:#fff; }
+        .wf-label { font-size:0.75rem; color:var(--color-text-muted); width:130px; flex-shrink:0; }
+        .wf-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+        .wf-track { flex:1; position:relative; height:28px; }
+        .tag { display:inline-flex; align-items:center; gap:5px; padding:2px 10px; border-radius:99px; font-size:0.72rem; font-weight:600; }
+        .bar-fill { height:100%; border-radius:4px; width:0%; transition:width 0.7s ease; }
+        .speaker-avatar { width:110px; height:110px; border-radius:50%; background:linear-gradient(135deg,var(--color-accent-1),var(--color-accent-2)); display:flex; align-items:center; justify-content:center; font-size:3rem; animation:avatar-pulse 3s ease-in-out infinite; flex-shrink:0; }
+    </style>
+</head>
+<body>
+<div class="mouse-spotlight" style="position:fixed;inset:0;z-index:99;pointer-events:none;"></div>
+<div class="deck">
+
+<!-- SLIDE 1: TITLE -->
+<div class="slide active" data-slide="1">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:500px;height:500px;top:-120px;right:-100px;background:var(--color-accent-1);opacity:0.13;"></div>
+        <div class="blob" style="width:350px;height:350px;bottom:-80px;left:-80px;background:var(--color-accent-2);opacity:0.11;"></div>
+        <div class="blob" style="width:220px;height:220px;top:45%;left:15%;background:var(--color-accent-3);opacity:0.09;"></div>
+    </div>
+    <canvas class="particle-canvas" style="position:absolute;inset:0;z-index:1;"></canvas>
+    <div class="content text-center">
+        <img class="mx-auto mb-5 animate-[float_3s_ease-in-out_infinite]" src="https://opentelemetry.io/img/logos/opentelemetry-horizontal-color.png" alt="OpenTelemetry logo" style="max-height:80px;object-fit:contain;filter:drop-shadow(0 0 18px rgba(56,189,248,0.4));">
+        <h1 class="font-display text-[clamp(2.6rem,6vw,4.8rem)] font-black bg-linear-to-br from-accent-1 via-accent-2 to-accent-1 bg-clip-text text-transparent tracking-tight mb-3 reveal">OpenTelemetry</h1>
+        <p class="text-[clamp(0.9rem,1.4vw,1.3rem)] font-light text-text-muted tracking-[5px] uppercase mb-8 reveal">Observability · Standard · Open Source</p>
+        <div class="flex gap-4 justify-center reveal">
+            <span class="tag" style="background:rgba(56,189,248,0.12);color:#38bdf8;border:1px solid rgba(56,189,248,0.2);">🎓 Entry Level</span>
+            <span class="tag" style="background:rgba(129,140,248,0.12);color:#818cf8;border:1px solid rgba(129,140,248,0.2);">⏱ 15 minuti</span>
+            <span class="tag" style="background:rgba(52,211,153,0.12);color:#34d399;border:1px solid rgba(52,211,153,0.2);">CNCF Incubating</span>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 2: SPEAKER -->
+<div class="slide" data-slide="2">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:420px;height:420px;top:-100px;right:-90px;background:var(--color-accent-2);opacity:0.10;"></div>
+        <div class="blob" style="width:300px;height:300px;bottom:-70px;left:-60px;background:var(--color-accent-1);opacity:0.08;"></div>
+    </div>
+    <canvas class="particle-canvas-ambient" style="position:absolute;inset:0;z-index:1;"></canvas>
+    <div class="content">
+        <p class="text-accent-2 text-sm uppercase tracking-[4px] mb-6 reveal">Chi sono</p>
+        <div class="flex gap-10 items-center">
+            <div class="reveal flex flex-col items-center gap-4" style="flex-shrink:0;">
+                <div class="speaker-avatar"><img class="speaker-avatar" src="https://res.cloudinary.com/startup-grind/image/upload/c_fill,dpr_2,f_auto,g_face,h_400,q_auto:good,w_400/v1/gcs/platform-data-goog/events/roberto-laricchia_eUawUfw.jpg" /></div>
+                <div class="text-center">
+                    <div class="font-display text-2xl font-bold text-text">Roberto Laricchia</div>
+                    <div class="text-text-muted text-sm mt-0.5">Senior Android Engineer</div>
+                </div>
+            </div>
+            <div class="flex-1">
+                <div class="space-y-3 reveal">
+                    <!-- Card azienda/ruolo -->
+                    <div class="bg-glass-bg border border-glass-border rounded-xl p-4 flex gap-3 items-start hover:-translate-y-1 transition">
+                        <span style="font-size:1.4rem;flex-shrink:0;">🏢</span>
+                        <div>
+                            <div class="font-semibold text-text text-sm">Qonto</div>
+                            <div class="text-text-muted text-xs mt-0.5">Qonto · Senior Android Engineer / Customer Engagement</div>
+                        </div>
+                    </div>
+                    <!-- Card tecnologie -->
+                    <div class="bg-glass-bg border border-glass-border rounded-xl p-4 flex gap-3 items-start hover:-translate-y-1 transition">
+                        <span style="font-size:1.4rem;flex-shrink:0;">🛠️</span>
+                        <div>
+                            <div class="font-semibold text-text text-sm">Stack</div>
+                            <div class="text-text-muted text-xs mt-0.5">Kotlin · Android · e tanto altro </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Social/contatti -->
+                <div class="flex gap-3 mt-4 reveal">
+                    <span class="tag" style="background:rgba(56,189,248,0.08);color:#94a3b8;border:1px solid rgba(255,255,255,0.07);"><a href="https://www.linkedin.com/in/robertolaricchia">💼 Linkedin</a></span>
+                    <span class="tag" style="background:rgba(56,189,248,0.08);color:#94a3b8;border:1px solid rgba(255,255,255,0.07);"><a href="https://github.com/laricchia">🐙 Github</a></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 3: AGENDA -->
+<div class="slide" data-slide="3">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:300px;height:300px;top:-60px;right:-60px;background:var(--color-accent-2);opacity:0.07;"></div>
+        <div class="blob" style="width:220px;height:220px;bottom:-50px;left:-40px;background:var(--color-accent-1);opacity:0.06;"></div>
+    </div>
+    <div class="content">
+        <p class="text-accent-1 text-sm uppercase tracking-[4px] mb-2 reveal">Agenda</p>
+        <h2 class="font-display text-[clamp(1.8rem,4vw,2.8rem)] font-bold mb-8 reveal">Di cosa parleremo</h2>
+        <div class="grid grid-cols-2 gap-4 reveal">
+            <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-xl p-5 flex gap-4 items-start hover:-translate-y-1 transition">
+                <span style="font-size:1.8rem">🔭</span>
+                <div><div class="font-semibold text-text mb-1">Observability</div><div class="text-text-muted text-sm">Cos'è, perché serve, la metafora della black box</div></div>
+            </div>
+            <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-xl p-5 flex gap-4 items-start hover:-translate-y-1 transition">
+                <span style="font-size:1.8rem">📦</span>
+                <div><div class="font-semibold text-text mb-1">OpenTelemetry</div><div class="text-text-muted text-sm">Lo standard de-facto del settore, cos'è OTel</div></div>
+            </div>
+            <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-xl p-5 flex gap-4 items-start hover:-translate-y-1 transition">
+                <span style="font-size:1.8rem">🔗</span>
+                <div><div class="font-semibold text-text mb-1">Span & Trace</div><div class="text-text-muted text-sm">I mattoni fondamentali del distributed tracing</div></div>
+            </div>
+            <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-xl p-5 flex gap-4 items-start hover:-translate-y-1 transition">
+                <span style="font-size:1.8rem">🚀</span>
+                <div><div class="font-semibold text-text mb-1">Demo live</div><div class="text-text-muted text-sm">App Android Kotlin in produzione + Q&A</div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 4: BLACK BOX -->
+<div class="slide" data-slide="4">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:400px;height:400px;top:-100px;left:-80px;background:var(--color-accent-1);opacity:0.08;"></div>
+        <div class="blob" style="width:250px;height:250px;bottom:-60px;right:-40px;background:var(--color-accent-3);opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <p class="text-accent-3 text-sm uppercase tracking-[4px] mb-2 reveal">Il Problema</p>
+        <h2 class="font-display text-[clamp(1.8rem,4vw,2.8rem)] font-bold mb-6 reveal">La <em>Black Box</em></h2>
+        <div class="grid grid-cols-2 gap-8 items-center">
+            <div class="reveal">
+                <p class="text-text-secondary mb-4 text-base leading-relaxed">Un sistema software in produzione è spesso una <strong class="text-text">scatola nera</strong>: riceve input, produce output, ma <strong class="text-accent-3">non sai cosa succede dentro</strong>.</p>
+                <p class="text-text-secondary text-base leading-relaxed mb-4">Quando qualcosa va storto, le domande tipiche sono:</p>
+                <ul class="space-y-2 text-text-secondary text-sm">
+                    <li class="flex gap-2 items-start"><span class="text-red-400 mt-0.5">●</span> Perché la risposta è lenta?</li>
+                    <li class="flex gap-2 items-start"><span class="text-red-400 mt-0.5">●</span> Quale servizio ha fallito?</li>
+                    <li class="flex gap-2 items-start"><span class="text-red-400 mt-0.5">●</span> Dove si è persa la richiesta?</li>
+                </ul>
+            </div>
+            <div class="reveal flex flex-col items-center gap-4">
+                <div class="flex items-center gap-4 w-full">
+                    <div class="flex-1 text-center">
+                        <div class="text-3xl mb-2">📨</div>
+                        <div class="text-xs text-text-muted uppercase tracking-wider">Input</div>
+                        <div class="text-xs text-text-secondary mt-1">HTTP request<br>Events<br>Messages</div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:center;">
+                        <div style="height:2px;width:40px;background:linear-gradient(to right,var(--color-accent-1),rgba(56,189,248,0.3));"></div>
+                        <div style="font-size:0.65rem;color:var(--color-text-muted);">→</div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="bg-glass-bg border border-glass-border rounded-xl p-4 text-center" style="background:rgba(15,15,25,0.8);border:2px solid rgba(255,255,255,0.06);">
+                            <div class="text-3xl mb-1">⬛</div>
+                            <div class="text-xs font-bold text-text-muted uppercase tracking-wider">Sistema</div>
+                            <div class="text-[10px] text-text-muted mt-1">??? cosa succede ???</div>
+                        </div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:center;">
+                        <div style="height:2px;width:40px;background:linear-gradient(to right,rgba(56,189,248,0.3),var(--color-accent-1));"></div>
+                        <div style="font-size:0.65rem;color:var(--color-text-muted);">→</div>
+                    </div>
+                    <div class="flex-1 text-center">
+                        <div class="text-3xl mb-2">📤</div>
+                        <div class="text-xs text-text-muted uppercase tracking-wider">Output</div>
+                        <div class="text-xs text-text-secondary mt-1">Response<br>Errors<br>Side effects</div>
+                    </div>
+                </div>
+                <div class="text-xs text-center text-text-muted mt-2 italic" style="max-width:280px;">Sai cosa entra e cosa esce, ma non <span class="text-accent-3">come</span> ci si arriva</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 5: OBSERVABILITY -->
+<div class="slide" data-slide="5">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:450px;height:450px;top:-100px;right:-100px;background:var(--color-accent-1);opacity:0.09;"></div>
+        <div class="blob" style="width:300px;height:300px;bottom:-70px;left:-60px;background:var(--color-accent-2);opacity:0.07;"></div>
+    </div>
+    <canvas class="particle-canvas-ambient" style="position:absolute;inset:0;z-index:1;"></canvas>
+    <div class="content">
+        <p class="text-accent-1 text-sm uppercase tracking-[4px] mb-2 reveal">Definizione</p>
+        <h2 class="font-display text-[clamp(1.8rem,4vw,2.8rem)] font-bold mb-6 reveal">Cos'è l'Observability?</h2>
+        <div class="bg-glass-bg backdrop-blur-xl border border-glass-border rounded-2xl p-6 mb-6 reveal" style="border-left:4px solid var(--color-accent-1);">
+            <p class="text-text-secondary text-base leading-relaxed italic">"L'observability ti permette di capire un sistema <strong class="text-text">dall'esterno</strong>, facendo domande senza conoscere il suo funzionamento interno — inclusi problemi <strong class="text-accent-1">mai visti prima</strong>."</p>
+            <p class="text-text-muted text-xs mt-2">— opentelemetry.io/docs/concepts</p>
+        </div>
+        <div class="grid grid-cols-3 gap-4 reveal">
+            <div class="bg-glass-bg border border-glass-border rounded-xl p-4 text-center hover:-translate-y-1 transition">
+                <div class="text-2xl mb-2">📊</div>
+                <div class="font-semibold text-accent-1 text-sm mb-1">Metrics</div>
+                <div class="text-text-muted text-xs">Aggregazioni numeriche nel tempo: CPU, error rate, latency</div>
+            </div>
+            <div class="bg-glass-bg border border-glass-border rounded-xl p-4 text-center hover:-translate-y-1 transition">
+                <div class="text-2xl mb-2">📝</div>
+                <div class="font-semibold text-accent-2 text-sm mb-1">Logs</div>
+                <div class="text-text-muted text-xs">Messaggi con timestamp emessi da servizi e componenti</div>
+            </div>
+            <div class="bg-glass-bg border border-glass-border rounded-xl p-4 text-center hover:-translate-y-1 transition">
+                <div class="text-2xl mb-2">🔗</div>
+                <div class="font-semibold text-accent-3 text-sm mb-1">Traces</div>
+                <div class="text-text-muted text-xs">Il percorso di una richiesta attraverso i servizi</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 6: COSA È OTEL -->
+<div class="slide" data-slide="6">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:380px;height:380px;top:-80px;left:-70px;background:var(--color-accent-2);opacity:0.1;"></div>
+        <div class="blob" style="width:280px;height:280px;bottom:-60px;right:-50px;background:var(--color-accent-1);opacity:0.08;"></div>
+    </div>
+    <div class="content">
+        <p class="text-accent-2 text-sm uppercase tracking-[4px] mb-2 reveal">Lo Standard</p>
+        <h2 class="font-display text-[clamp(1.8rem,4vw,2.8rem)] font-bold mb-6 reveal">OpenTelemetry</h2>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="reveal">
+                <p class="text-text-secondary text-sm leading-relaxed mb-4">OTel è un framework open-source <strong class="text-text">vendor-neutral</strong> per strumentare, generare, raccogliere ed esportare dati di telemetria.</p>
+                <div class="space-y-3">
+                    <div class="flex gap-3 items-start">
+                        <span class="tag mt-0.5" style="background:rgba(56,189,248,0.1);color:#38bdf8;border:1px solid rgba(56,189,248,0.2);flex-shrink:0;">CNCF</span>
+                        <span class="text-text-secondary text-sm">Progetto incubating della Cloud Native Computing Foundation</span>
+                    </div>
+                    <div class="flex gap-3 items-start">
+                        <span class="tag mt-0.5" style="background:rgba(52,211,153,0.1);color:#34d399;border:1px solid rgba(52,211,153,0.2);flex-shrink:0;">SDK</span>
+                        <span class="text-text-secondary text-sm">API & SDK per Java, <strong class="text-accent-3">Kotlin/Android</strong>, Python, Go, JS e molti altri</span>
+                    </div>
+                </div>
+            </div>
+            <div class="reveal">
+                <div class="text-xs text-text-muted uppercase tracking-wider mb-3 text-center">Pipeline OTel</div>
+                <div class="space-y-2">
+                    <div class="bg-glass-bg border border-glass-border rounded-lg p-3 text-center">
+                        <div class="text-sm font-semibold text-text">📱 App instrumentata</div>
+                        <div class="text-xs text-text-muted mt-0.5">SDK OTel → genera Spans, Metrics, Logs</div>
+                    </div>
+                    <div class="text-center text-text-muted text-lg">↓</div>
+                    <div class="bg-glass-bg border border-glass-border rounded-lg p-3 text-center" style="border-color:rgba(56,189,248,0.25);">
+                        <div class="text-sm font-semibold text-accent-1">⚙️ OTel Collector</div>
+                        <div class="text-xs text-text-muted mt-0.5">Riceve · Processa · Esporta</div>
+                    </div>
+                    <div class="text-center text-text-muted text-lg">↓</div>
+                    <div class="flex gap-2">
+                        <div class="flex-1 bg-glass-bg border border-glass-border rounded-lg p-2 text-center"><div class="text-xs text-text-muted">Jaeger</div></div>
+                        <div class="flex-1 bg-glass-bg border border-glass-border rounded-lg p-2 text-center"><div class="text-xs text-text-muted">Grafana</div></div>
+                        <div class="flex-1 bg-glass-bg border border-glass-border rounded-lg p-2 text-center"><div class="text-xs text-text-muted">Datadog</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 7: SPAN -->
+<div class="slide" data-slide="7">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:420px;height:420px;top:-90px;right:-90px;background:var(--color-accent-3);opacity:0.08;"></div>
+        <div class="blob" style="width:250px;height:250px;bottom:-50px;left:-50px;background:var(--color-accent-1);opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <p class="text-accent-3 text-sm uppercase tracking-[4px] mb-2 reveal">Building block</p>
+        <h2 class="font-display text-[clamp(1.8rem,4vw,2.8rem)] font-bold mb-5 reveal">Cos'è uno Span?</h2>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="reveal">
+                <p class="text-text-secondary text-sm leading-relaxed mb-4">Uno <strong class="text-accent-3">span</strong> rappresenta una <strong class="text-text">singola unità di lavoro</strong>. È il mattone fondamentale del tracing.</p>
+                <div class="space-y-2 text-sm">
+                    <div class="flex gap-2 items-center"><span class="text-accent-3">▸</span><span class="text-text-secondary"><strong class="text-text">Name</strong> — nome dell'operazione</span></div>
+                    <div class="flex gap-2 items-center"><span class="text-accent-3">▸</span><span class="text-text-secondary"><strong class="text-text">Trace ID</strong> — identifica la trace padre</span></div>
+                    <div class="flex gap-2 items-center"><span class="text-accent-3">▸</span><span class="text-text-secondary"><strong class="text-text">Span ID</strong> — identifica univocamente lo span</span></div>
+                    <div class="flex gap-2 items-center"><span class="text-accent-3">▸</span><span class="text-text-secondary"><strong class="text-text">Start / End time</strong> — durata precisa</span></div>
+                    <div class="flex gap-2 items-center"><span class="text-accent-3">▸</span><span class="text-text-secondary"><strong class="text-text">Attributes</strong> — metadati chiave-valore</span></div>
+                    <div class="flex gap-2 items-center"><span class="text-accent-3">▸</span><span class="text-text-secondary"><strong class="text-text">Status</strong> — Unset / Error / Ok</span></div>
+                    <div class="flex gap-2 items-center"><span class="text-accent-3">▸</span><span class="text-text-secondary"><strong class="text-text">Parent Span ID</strong> — vuoto se root span</span></div>
+                </div>
+            </div>
+            <div class="reveal">
+                <div class="text-xs text-text-muted uppercase tracking-wider mb-2">Kotlin Android — creare uno span</div>
+                <div class="bg-glass-bg border border-glass-border rounded-xl p-4" style="font-family:monospace;font-size:0.68rem;line-height:1.65;color:#94a3b8;">
+                    <div><span style="color:#64748b;">// Ottieni il tracer dal RUM</span></div>
+                    <div><span style="color:#38bdf8;">val</span> <span style="color:#f1f5f9;">tracer</span> = <span style="color:#34d399;">OpenTelemetryRum</span></div>
+                    <div>&nbsp;&nbsp;.tracer(<span style="color:#fbbf24;">"my-tracer"</span>)</div>
+                    <div style="margin-top:6px;"><span style="color:#64748b;">// Crea e avvia uno span</span></div>
+                    <div><span style="color:#38bdf8;">val</span> <span style="color:#f1f5f9;">span</span> = tracer</div>
+                    <div>&nbsp;&nbsp;.<span style="color:#34d399;">spanBuilder</span>(<span style="color:#fbbf24;">"fetchOrders"</span>)</div>
+                    <div>&nbsp;&nbsp;.<span style="color:#34d399;">startSpan</span>()</div>
+                    <div style="margin-top:6px;"><span style="color:#38bdf8;">try</span> {</div>
+                    <div>&nbsp;&nbsp;span.<span style="color:#34d399;">setAttribute</span>(</div>
+                    <div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#fbbf24;">"user.id"</span>, userId</div>
+                    <div>&nbsp;&nbsp;)</div>
+                    <div>&nbsp;&nbsp;<span style="color:#64748b;">// ... logica app ...</span></div>
+                    <div>} <span style="color:#38bdf8;">finally</span> {</div>
+                    <div>&nbsp;&nbsp;span.<span style="color:#34d399;">end</span>()</div>
+                    <div>}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 8: TRACE -->
+<div class="slide" data-slide="8">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:400px;height:400px;top:-80px;left:-70px;background:var(--color-accent-2);opacity:0.09;"></div>
+        <div class="blob" style="width:280px;height:280px;bottom:-60px;right:-50px;background:var(--color-accent-3);opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <p class="text-accent-2 text-sm uppercase tracking-[4px] mb-2 reveal">Distributed Tracing</p>
+        <h2 class="font-display text-[clamp(1.8rem,4vw,2.8rem)] font-bold mb-4 reveal">Cos'è una Trace?</h2>
+        <p class="text-text-secondary text-sm mb-5 reveal">Una <strong class="text-accent-2">trace</strong> registra il percorso di una singola richiesta attraverso più servizi. È composta da <strong class="text-text">uno o più span</strong> collegati dallo stesso <code style="background:rgba(56,189,248,0.1);padding:1px 6px;border-radius:4px;color:#38bdf8;font-size:0.75rem;">trace_id</code>.</p>
+        <div class="reveal">
+            <div class="text-xs text-text-muted uppercase tracking-wider mb-3">Waterfall diagram — una richiesta Android, 4 span</div>
+            <div style="background:var(--color-glass-bg);border:1px solid var(--color-glass-border);border-radius:12px;padding:16px;">
+                <div class="wf-row">
+                    <div class="wf-label">📱 Android App</div>
+                    <div class="wf-track"><div class="wf-bar bar-fill" data-width="95" style="background:linear-gradient(to right,#38bdf8,#818cf8);">Root span</div></div>
+                </div>
+                <div class="wf-row" style="padding-left:20px;">
+                    <div class="wf-label">🔧 API Service</div>
+                    <div class="wf-track"><div class="wf-bar bar-fill" data-width="70" style="background:linear-gradient(to right,#818cf8,#a78bfa);margin-left:5%;">Child span</div></div>
+                </div>
+                <div class="wf-row" style="padding-left:40px;">
+                    <div class="wf-label">🗄️ DB Query</div>
+                    <div class="wf-track"><div class="wf-bar bar-fill" data-width="30" style="background:linear-gradient(to right,#34d399,#059669);margin-left:20%;">DB span</div></div>
+                </div>
+                <div class="wf-row" style="padding-left:40px;">
+                    <div class="wf-label">📨 Push Notif.</div>
+                    <div class="wf-track"><div class="wf-bar bar-fill" data-width="25" style="background:linear-gradient(to right,#fb923c,#f97316);margin-left:60%;">Async span</div></div>
+                </div>
+            </div>
+            <div class="flex gap-4 mt-3 text-xs text-text-muted">
+                <span><span style="color:#38bdf8;">■</span> Root (Android)</span>
+                <span><span style="color:#818cf8;">■</span> Child API</span>
+                <span><span style="color:#34d399;">■</span> Sub-op DB</span>
+                <span><span style="color:#fb923c;">■</span> Asincrono</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 9: OTel KOTLIN ANDROID -->
+<div class="slide" data-slide="9">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:420px;height:420px;top:-90px;right:-80px;background:var(--color-accent-3);opacity:0.10;"></div>
+        <div class="blob" style="width:280px;height:280px;bottom:-60px;left:-50px;background:var(--color-accent-2);opacity:0.08;"></div>
+    </div>
+    <div class="content">
+        <p class="text-accent-3 text-sm uppercase tracking-[4px] mb-2 reveal">In pratica</p>
+        <h2 class="font-display text-[clamp(1.6rem,3.5vw,2.5rem)] font-bold mb-5 reveal">OTel su Android & Kotlin</h2>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="reveal">
+                <div class="space-y-3">
+                    <div class="bg-glass-bg border border-glass-border rounded-xl p-4" style="border-left:3px solid var(--color-accent-2);">
+                        <div class="font-semibold text-accent-2 text-sm mb-1">🎯 opentelemetry-kotlin (OTel)</div>
+                        <div class="text-text-muted text-xs">Implementazione Kotlin Multiplatform dell'API OTel. Supporta la modalità <em>compatibility</em> con la SDK per Java</div>
+                        <div class="text-text-muted text-xs mt-1.5 font-mono" style="color:#818cf8;">github.com/open-telemetry/opentelemetry-kotlin</div>
+                    </div>
+                </div>
+            </div>
+            <div class="reveal">
+                <div class="text-xs text-text-muted uppercase tracking-wider mb-2">Setup — Application.kt</div>
+                <div class="bg-glass-bg border border-glass-border rounded-xl p-3" style="font-family:monospace;font-size:0.65rem;line-height:1.6;color:#94a3b8;">
+                    <div><span style="color:#38bdf8;">val</span> <span style="color:#f1f5f9;">rum</span> = <span style="color:#34d399;">OpenTelemetryRum</span></div>
+                    <div>&nbsp;.<span style="color:#34d399;">builder</span>(<span style="color:#38bdf8;">this</span>, config)</div>
+                    <div>&nbsp;.<span style="color:#34d399;">addSpanExporterCustomizer</span> {</div>
+                    <div>&nbsp;&nbsp;<span style="color:#34d399;">OtlpHttpSpanExporter</span></div>
+                    <div>&nbsp;&nbsp;&nbsp;.<span style="color:#34d399;">builder</span>()</div>
+                    <div>&nbsp;&nbsp;&nbsp;.<span style="color:#34d399;">setEndpoint</span>(collectorUrl)</div>
+                    <div>&nbsp;&nbsp;&nbsp;.<span style="color:#34d399;">build</span>()</div>
+                    <div>&nbsp;}</div>
+                    <div>&nbsp;.<span style="color:#34d399;">addTracerProviderCustomizer</span> {</div>
+                    <div>&nbsp;&nbsp;builder, _ <span style="color:#38bdf8;">-></span></div>
+                    <div>&nbsp;&nbsp;builder.<span style="color:#34d399;">addSpanProcessor</span>(</div>
+                    <div>&nbsp;&nbsp;&nbsp;<span style="color:#34d399;">BatchSpanProcessor</span></div>
+                    <div>&nbsp;&nbsp;&nbsp;&nbsp;.<span style="color:#34d399;">builder</span>(otlpExporter)</div>
+                    <div>&nbsp;&nbsp;&nbsp;&nbsp;.<span style="color:#34d399;">build</span>()</div>
+                    <div>&nbsp;&nbsp;)</div>
+                    <div>&nbsp;}</div>
+                    <div>&nbsp;.<span style="color:#34d399;">build</span>()</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 10: PERCHÉ OTel -->
+<div class="slide" data-slide="10">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:450px;height:450px;top:-100px;right:-100px;background:var(--color-accent-1);opacity:0.09;"></div>
+        <div class="blob" style="width:300px;height:300px;bottom:-60px;left:-60px;background:var(--color-accent-2);opacity:0.07;"></div>
+    </div>
+    <div class="content">
+        <p class="text-accent-1 text-sm uppercase tracking-[4px] mb-2 reveal">Il valore</p>
+        <h2 class="font-display text-[clamp(1.8rem,4vw,2.8rem)] font-bold mb-6 reveal">Perché adottare OTel?</h2>
+        <div class="grid grid-cols-2 gap-4">
+            <div class="bg-glass-bg border border-glass-border rounded-xl p-5 hover:-translate-y-1 transition reveal" style="border-left:3px solid var(--color-accent-1);">
+                <div class="text-xl mb-2">🔓</div>
+                <div class="font-semibold text-text mb-1">Nessun vendor lock-in</div>
+                <div class="text-text-muted text-sm">Modifica il codice una volta sola. Puoi cambiare il database/visualizzatore senza doverlo toccare.</div>
+            </div>
+            <div class="bg-glass-bg border border-glass-border rounded-xl p-5 hover:-translate-y-1 transition reveal" style="border-left:3px solid var(--color-accent-2);">
+                <div class="text-xl mb-2">🌍</div>
+                <div class="font-semibold text-text mb-1">Standard de-facto</div>
+                <div class="text-text-muted text-sm">Integrato in Kubernetes, Spring Boot, Android, GitHub...</div>
+            </div>
+            <div class="bg-glass-bg border border-glass-border rounded-xl p-5 hover:-translate-y-1 transition reveal" style="border-left:3px solid var(--color-accent-3);">
+                <div class="text-xl mb-2">🤖</div>
+                <div class="font-semibold text-text mb-1">Auto-instrumentation</div>
+                <div class="text-text-muted text-sm">Zero-code per OkHttp, Fragment, Activity lifecycle su Android. Pochissime modifiche al codice dell'app.</div>
+            </div>
+            <div class="bg-glass-bg border border-glass-border rounded-xl p-5 hover:-translate-y-1 transition reveal" style="border-left:3px solid #fb923c;">
+                <div class="text-xl mb-2">📡</div>
+                <div class="font-semibold text-text mb-1">3 segnali unificati</div>
+                <div class="text-text-muted text-sm">Traces + Metrics + Logs in un unico SDK. Correlazione automatica tra i segnali per la root cause analysis.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 11: DEMO -->
+<div class="slide" data-slide="11">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:500px;height:500px;top:-120px;right:-120px;background:var(--color-accent-3);opacity:0.10;"></div>
+        <div class="blob" style="width:300px;height:300px;bottom:-70px;left:-60px;background:var(--color-accent-1);opacity:0.09;"></div>
+        <div class="blob" style="width:200px;height:200px;top:30%;left:20%;background:var(--color-accent-2);opacity:0.07;"></div>
+    </div>
+    <canvas class="particle-canvas" style="position:absolute;inset:0;z-index:1;"></canvas>
+    <div class="content text-center">
+        <div class="text-[80px] mb-4 animate-[float_3s_ease-in-out_infinite] reveal">🚀</div>
+        <h2 class="font-display text-[clamp(2rem,5vw,3.5rem)] font-bold bg-linear-to-br from-accent-3 via-accent-1 to-accent-2 bg-clip-text text-transparent mb-4 reveal">Demo Live</h2>
+        <p class="text-text-secondary text-base mb-6 reveal"><strong class="text-accent-3">Qonto App</strong> con OTel</p>
+        <div class="flex gap-4 justify-center reveal">
+            <div class="bg-glass-bg border border-glass-border rounded-xl px-6 py-3 text-sm">
+                <span class="text-accent-2 font-semibold">Trace viewer</span><br>
+                <span class="text-text-muted text-xs">Board & traces in Grafana</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 12: Q&A -->
+<div class="slide" data-slide="12">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:550px;height:550px;top:-130px;right:-130px;background:var(--color-accent-1);opacity:0.13;"></div>
+        <div class="blob" style="width:380px;height:380px;bottom:-100px;left:-80px;background:var(--color-accent-2);opacity:0.10;"></div>
+        <div class="blob" style="width:250px;height:250px;top:40%;left:20%;background:var(--color-accent-3);opacity:0.08;"></div>
+    </div>
+    <canvas class="particle-canvas" style="position:absolute;inset:0;z-index:1;"></canvas>
+    <div class="content text-center">
+        <div class="text-[80px] mb-3 animate-[float_3s_ease-in-out_infinite] reveal">❓</div>
+        <h2 class="font-display text-[clamp(2.5rem,6vw,4rem)] font-bold bg-linear-to-br from-accent-1 via-accent-2 to-accent-3 bg-clip-text text-transparent mb-3 reveal">Q & A</h2>
+        <p class="text-text-muted tracking-[4px] uppercase text-sm mb-8 reveal">Domande/Curiosità?</p>
+        <div class="flex gap-6 justify-center reveal">
+            <div class="text-center">
+                <div class="text-lg mb-1">📖</div>
+                <div class="text-xs text-text-muted"><a href=https://opentelemetry.io/docs>OTel docs</a></div>
+            </div>
+            <div class="text-center">
+                <div class="text-lg mb-1">📱</div>
+                <div class="text-xs text-text-muted"><a href="https://opentelemetry.io/docs/platforms/client-apps/android">OTel on Android</a></div>
+            </div>
+            <div class="text-center">
+                <div class="text-lg mb-1">⭐</div>
+                <div class="text-xs text-text-muted"><a href="https://github.com/open-telemetry/opentelemetry-kotlin">OTel on Kotlin</a></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SLIDE 13: GRAZIE -->
+<div class="slide" data-slide="13">
+    <div class="gradient-mesh">
+        <div class="blob" style="width:600px;height:600px;top:-150px;right:-150px;background:var(--color-accent-1);opacity:0.13;"></div>
+        <div class="blob" style="width:400px;height:400px;bottom:-110px;left:-90px;background:var(--color-accent-2);opacity:0.10;"></div>
+        <div class="blob" style="width:260px;height:260px;top:35%;left:18%;background:var(--color-accent-3);opacity:0.09;"></div>
+    </div>
+    <canvas class="particle-canvas" style="position:absolute;inset:0;z-index:1;"></canvas>
+    <div class="content text-center">
+        <div class="text-[75px] mb-4 animate-[float_3s_ease-in-out_infinite] reveal">✨✨✨</div>
+        <h2 class="font-display text-[clamp(2.8rem,6.5vw,5rem)] font-black bg-linear-to-br from-accent-1 via-accent-2 to-accent-3 bg-clip-text text-transparent mb-2 reveal">Grazie!</h2>
+        <p class="text-text-muted tracking-[5px] uppercase text-sm mb-10 reveal">Grazie per l'attenzione</p>
+
+        <!-- Speaker info -->
+        <div class="flex flex-col items-center gap-3 reveal">
+            <!-- Social links -->
+            <div class="flex gap-4 mt-3">
+                <a href="https://linkedin.com/in/robertolaricchia" target="_blank" rel="noopener noreferrer"
+                   class="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium hover:-translate-y-1 transition"
+                   style="background:rgba(56,189,248,0.1);color:#38bdf8;border:1px solid rgba(56,189,248,0.22);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/>
+                        <rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/>
+                    </svg>
+                    linkedin.com/in/robertolaricchia
+                </a>
+                <a href="https://github.com/laricchia" target="_blank" rel="noopener noreferrer"
+                   class="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium hover:-translate-y-1 transition"
+                   style="background:rgba(129,140,248,0.1);color:#818cf8;border:1px solid rgba(129,140,248,0.22);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+                    </svg>
+                    github.com/laricchia
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<!-- NAV -->
+<div class="nav-controls">
+    <button class="nav-btn" onclick="changeSlide(-1)">&#8249;</button>
+    <div class="slide-dots" id="dots"></div>
+    <button class="nav-btn" onclick="changeSlide(1)">&#8250;</button>
+    <span class="slide-counter" id="counter">1 / 13</span>
+</div>
+
+<script>
+let current = 1;
+const total = document.querySelectorAll('.slide').length;
+const dotsContainer = document.getElementById('dots');
+const counter = document.getElementById('counter');
+for (let i = 1; i <= total; i++) { const dot = document.createElement('div'); dot.className = 'dot' + (i === 1 ? ' active' : ''); dot.onclick = () => goToSlide(i); dotsContainer.appendChild(dot); }
+function goToSlide(n) {
+    const prev = document.querySelector('.slide.active');
+    const next = document.querySelector(`.slide[data-slide="${n}"]`);
+    if (prev) prev.classList.remove('active');
+    if (next) { next.classList.add('active'); animateSlide(next); }
+    current = n; updateNav();
+}
+function changeSlide(dir) { let next = current + dir; if (next < 1) next = total; if (next > total) next = 1; goToSlide(next); }
+function updateNav() { document.querySelectorAll('.dot').forEach((d, i) => { d.classList.toggle('active', i + 1 === current); }); counter.textContent = current + ' / ' + total; }
+document.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); changeSlide(1); } if (e.key === 'ArrowLeft') { e.preventDefault(); changeSlide(-1); } });
+let touchStartX = 0;
+document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+document.addEventListener('touchend', (e) => { const diff = touchStartX - e.changedTouches[0].clientX; if (Math.abs(diff) > 50) changeSlide(diff > 0 ? 1 : -1); });
+
+function animateSlide(slide) {
+    slide.querySelectorAll('.reveal').forEach((el, i) => {
+        el.style.transition = 'none'; el.style.opacity = '0'; el.style.transform = 'translateY(20px)'; el.offsetHeight;
+        const delay = i * 0.08;
+        el.style.transition = `opacity 0.35s ease ${delay}s, transform 0.35s ease ${delay}s`;
+        el.style.opacity = '1'; el.style.transform = 'translateY(0px)';
+    });
+    animateSlideEffects(slide);
+}
+
+function animateSlideEffects(slide) {
+    slide.querySelectorAll('.wf-bar.bar-fill:not(.fill-init)').forEach((bar, i) => {
+        bar.classList.add('fill-init');
+        bar.style.width = '0%'; bar.style.transition = `width 0.6s ease ${0.3 + i * 0.15}s`; bar.offsetHeight; bar.style.width = bar.dataset.width + '%';
+    });
+}
+
+document.addEventListener('mousemove', (e) => {
+    const spotlight = document.querySelector('.mouse-spotlight');
+    if (spotlight) spotlight.style.background = `radial-gradient(600px circle at ${e.clientX}px ${e.clientY}px, rgba(56,189,248,0.06), transparent 40%)`;
+});
+
+window.initParticles = function(canvas, options) {
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+    const interactive = options.interactive !== false;
+    const count = options.count || (interactive ? 55 : 18);
+    let mx = -1000, my = -1000;
+    const particles = Array.from({ length: count }, () => ({
+        x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
+        size: Math.random() * 2.5 + 0.8, alpha: Math.random() * 0.35 + 0.1
+    }));
+    if (interactive) { canvas.addEventListener('mousemove', (e) => { const rect = canvas.getBoundingClientRect(); mx = e.clientX - rect.left; my = e.clientY - rect.top; }); canvas.addEventListener('mouseleave', () => { mx = -1000; my = -1000; }); }
+    (function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => {
+            if (interactive) { const dx = p.x - mx, dy = p.y - my, dist = Math.sqrt(dx*dx+dy*dy); if (dist < 120) { const force = (120-dist)/120*2; p.vx += (dx/dist)*force*0.1; p.vy += (dy/dist)*force*0.1; } }
+            p.vx *= 0.98; p.vy *= 0.98; p.x += p.vx; p.y += p.vy;
+            if (p.x < 0) p.x = canvas.width; if (p.x > canvas.width) p.x = 0;
+            if (p.y < 0) p.y = canvas.height; if (p.y > canvas.height) p.y = 0;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+            ctx.fillStyle = `rgba(56,189,248,${p.alpha})`; ctx.fill();
+        });
+        requestAnimationFrame(animate);
+    })();
+};
+document.querySelectorAll('.particle-canvas').forEach(c => window.initParticles(c, { interactive: true, count: 55 }));
+document.querySelectorAll('.particle-canvas-ambient').forEach(c => window.initParticles(c, { interactive: false, count: 18 }));
+try { animateSlide(document.querySelector('.slide.active')); } catch(e) {}
+</script>
+</body>
+</html>
